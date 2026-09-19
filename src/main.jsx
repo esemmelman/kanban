@@ -18,7 +18,9 @@ function Editable({value,onSave,placeholder,emphasis=false,autoFocus=false,clear
 
 function App(){
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[newItem,setNewItem]=useState(''),[adding,setAdding]=useState(false),[error,setError]=useState('');
- const load=async()=>{const {data,error}=await supabase.from('kanban_items').select('*, kanban_notes(*)').order('position').order('position',{referencedTable:'kanban_notes'});if(error)setError(error.message);else setItems(data||[]);setLoading(false)};
+ const draggingId=useRef(null); const savingOrder=useRef(false); const itemsRef=useRef([]);
+ useEffect(()=>{itemsRef.current=items},[items]);
+ const load=async()=>{if(draggingId.current||savingOrder.current)return;const {data,error}=await supabase.from('kanban_items').select('*, kanban_notes(*)').order('position').order('position',{referencedTable:'kanban_notes'});if(error)setError(error.message);else setItems(data||[]);setLoading(false)};
  useEffect(()=>{load();const channel=supabase.channel('board').on('postgres_changes',{event:'*',schema:'public',table:'kanban_items'},load).on('postgres_changes',{event:'*',schema:'public',table:'kanban_notes'},load).subscribe();return()=>supabase.removeChannel(channel)},[]);
  const addItem=async e=>{e.preventDefault();const title=newItem.trim();if(!title)return;setAdding(true);const {error}=await supabase.from('kanban_items').insert({title,position:items.length});if(error)setError(error.message);else{setNewItem('');await load()}setAdding(false)};
  const updateItem=async(id,title)=>{await supabase.from('kanban_items').update({title}).eq('id',id);await load()};
@@ -26,12 +28,14 @@ function App(){
  const addNote=async(itemId,position,content)=>{const {error}=await supabase.from('kanban_notes').insert({item_id:itemId,content,position});if(error){setError(error.message);throw error}await load()};
  const remove=async id=>{await supabase.from('kanban_items').delete().eq('id',id);await load()};
  const removeNote=async id=>{const {error}=await supabase.from('kanban_notes').delete().eq('id',id);if(error)setError(error.message);else await load()};
+ const moveRow=overId=>{const from=itemsRef.current.findIndex(item=>item.id===draggingId.current);const to=itemsRef.current.findIndex(item=>item.id===overId);if(from<0||to<0||from===to)return;const reordered=[...itemsRef.current];const [moved]=reordered.splice(from,1);reordered.splice(to,0,moved);itemsRef.current=reordered;setItems(reordered)};
+ const finishRowDrag=async()=>{if(!draggingId.current)return;const reordered=itemsRef.current;savingOrder.current=true;draggingId.current=null;const results=await Promise.all(reordered.map((item,position)=>supabase.from('kanban_items').update({position}).eq('id',item.id)));const failed=results.find(result=>result.error);if(failed)setError(failed.error.message);savingOrder.current=false;await load()};
  const maxNotes=Math.max(1,...items.map(i=>i.kanban_notes.length+1));
  return <main>
   <section className="board-shell">
    {loading?<div className="loading"><LoaderCircle className="spin"/>Loading your board…</div>:<>
     <div className="board" style={{'--cols':maxNotes+1}}>
-     {items.map(item=><div className="row" key={item.id}>
+     {items.map(item=><div className="row" key={item.id} draggable onDragStart={event=>{draggingId.current=item.id;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',item.id);event.currentTarget.classList.add('dragging')}} onDragOver={event=>{event.preventDefault();event.dataTransfer.dropEffect='move';moveRow(item.id)}} onDrop={event=>{event.preventDefault();finishRowDrag()}} onDragEnd={event=>{event.currentTarget.classList.remove('dragging');finishRowDrag()}}>
       <div className="cell item-cell"><div className="item-number">{formatTimestamp(item.created_at)}</div><Editable emphasis value={item.title} onSave={v=>updateItem(item.id,v)}/><button className="delete" onClick={()=>remove(item.id)} title="Delete item"><Trash2 size={15}/></button></div>
       {item.kanban_notes.map(note=><React.Fragment key={note.id}><div className="connector"><ArrowRight size={15}/></div><div className="cell note-cell"><div className="note-meta">{formatTimestamp(note.created_at)}</div><Editable value={note.content} onSave={v=>updateNote(note.id,v)}/><button className="delete" onClick={()=>removeNote(note.id)} title="Delete note" aria-label="Delete note"><Trash2 size={15}/></button></div></React.Fragment>)}
       <React.Fragment key={`add-${item.id}-${item.kanban_notes.length}`}><div className="connector"><ArrowRight size={15}/></div><div className="cell add-note"><Editable clearOnSave placeholder="Add next update…" value="" onSave={v=>addNote(item.id,item.kanban_notes.length,v)}/></div></React.Fragment>
