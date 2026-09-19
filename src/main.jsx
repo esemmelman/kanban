@@ -6,11 +6,12 @@ import packageInfo from '../package.json';
 import './styles.css';
 
 const supabase=createClient(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
-const formatTimestamp=value=>new Intl.DateTimeFormat(undefined,{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));
+const formatTimestamp=value=>new Intl.DateTimeFormat(undefined,{weekday:'short',month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));
 
 function Editable({value,onSave,placeholder,emphasis=false,autoFocus=false,clearOnSave=false}){
  const [text,setText]=useState(value||''); const [saving,setSaving]=useState(false); const ref=useRef(null); const savingRef=useRef(false);
  useEffect(()=>setText(value||''),[value]);
+ useEffect(()=>{if(ref.current){ref.current.style.height='auto';ref.current.style.height=`${ref.current.scrollHeight}px`}},[text]);
  const save=async()=>{const clean=text.trim();if(savingRef.current||clean===value||!clean)return;savingRef.current=true;setSaving(true);if(clearOnSave)setText('');try{await onSave(clean)}catch{if(clearOnSave)setText(clean)}finally{savingRef.current=false;setSaving(false)}};
  return <div className={'editable '+(emphasis?'emphasis':'')}><textarea ref={ref} autoFocus={autoFocus} rows="1" value={text} placeholder={placeholder} onChange={e=>setText(e.target.value)} onBlur={save} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.currentTarget.blur()}}}/>{saving&&<LoaderCircle className="spin" size={15}/>}</div>
 }
