@@ -7,3 +7,4 @@
 @media(max-width:700px){.board-shell{scroll-snap-type:x proximity}.cell,.item-cell{width:calc(100vw - 24px);flex-basis:calc(100vw - 24px);min-height:150px;scroll-snap-align:start}.row{min-height:150px}.editable textarea,.editable.emphasis textarea{height:auto;min-height:1.5em;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere}.note-meta,.item-number{max-width:calc(100% - 42px);white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25}}
 .item-cell,.note-cell,.add-note{display:flex;align-items:center;justify-content:center}.editable textarea{text-align:center}.editable{justify-content:center}
 .row{cursor:grab;transition:opacity .16s ease,transform .16s ease}.row:active{cursor:grabbing}.row.dragging{opacity:.45;transform:scale(.99)}.row textarea{cursor:text}.row button{cursor:pointer}
+.row.touch-dragging{position:relative;z-index:5;touch-action:none;box-shadow:0 12px 30px #173f3230}
