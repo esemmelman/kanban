@@ -6,7 +6,7 @@ import packageInfo from '../package.json';
 import './styles.css';
 
 const supabase=createClient(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
-const formatTimestamp=value=>new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));
+const formatTimestamp=value=>new Intl.DateTimeFormat(undefined,{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));
 
 function Editable({value,onSave,placeholder,emphasis=false,autoFocus=false,clearOnSave=false}){
  const [text,setText]=useState(value||''); const [saving,setSaving]=useState(false); const ref=useRef(null); const savingRef=useRef(false);
