@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createClient} from '@supabase/supabase-js';
-import {ArrowRight, Check, CirclePlus, LoaderCircle, MoreHorizontal, Plus, Trash2} from 'lucide-react';
+import {ArrowRight, Check, LoaderCircle, MoreHorizontal, Trash2} from 'lucide-react';
 import './styles.css';
 
 const supabase=createClient(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
@@ -31,13 +31,13 @@ function App(){
      {items.map(item=><div className="row" key={item.id}>
       <div className="cell item-cell"><div className="item-number">{String(items.indexOf(item)+1).padStart(2,'0')}</div><Editable emphasis value={item.title} onSave={v=>updateItem(item.id,v)}/><button className="delete" onClick={()=>remove(item.id)} title="Delete item"><Trash2 size={15}/></button></div>
       {item.kanban_notes.map((note,index)=><React.Fragment key={note.id}><div className="connector"><ArrowRight size={15}/></div><div className="cell note-cell"><div className="note-meta">UPDATE {String(index+1).padStart(2,'0')}</div><Editable value={note.content} onSave={v=>updateNote(note.id,v)}/></div></React.Fragment>)}
-      <div className="connector"><ArrowRight size={15}/></div><div className="cell add-note"><CirclePlus size={19}/><Editable placeholder="Add next update…" value="" onSave={v=>addNote(item,v)}/></div>
+      <div className="connector"><ArrowRight size={15}/></div><div className="cell add-note"><Editable placeholder="Add next update…" value="" onSave={v=>addNote(item,v)}/></div>
      </div>)}
     </div>
     {items.length===0&&<div className="empty"><MoreHorizontal/><h2>Your board is ready.</h2><p>Add the first item below, then follow its story across the row.</p></div>}
    </>}
   </section>
-  <form className="new-item" onSubmit={addItem}><div className="plus"><Plus size={20}/></div><input value={newItem} onChange={e=>setNewItem(e.target.value)} placeholder="Add a new item…"/><button disabled={!newItem.trim()||adding}>{adding?'Adding…':'Add item'} <span>↵</span></button></form>
+  <form className="new-item" onSubmit={addItem}><input disabled={adding} value={newItem} onChange={e=>setNewItem(e.target.value)} placeholder={adding?'Adding…':'Type a new item and press Enter…'}/></form>
   {error&&<div className="error" onClick={()=>setError('')}>{error}</div>}
   <footer><span>{items.length} {items.length===1?'item':'items'}</span><span>Click any entry to edit · Enter to save</span></footer>
  </main>

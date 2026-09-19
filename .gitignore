@@ -2,5 +2,5 @@ node_modules
 dist
 .env.local
 .DS_Store
-.site-package
-site.tar.gz
+.site-package*
+site*.tar.gz
