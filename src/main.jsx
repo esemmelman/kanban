@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createClient} from '@supabase/supabase-js';
-import {ArrowRight, Check, LoaderCircle, MoreHorizontal, Trash2} from 'lucide-react';
+import {ArrowRight, LoaderCircle, MoreHorizontal, Trash2} from 'lucide-react';
 import packageInfo from '../package.json';
 import './styles.css';
 
@@ -28,7 +28,6 @@ function App(){
  const removeNote=async id=>{const {error}=await supabase.from('kanban_notes').delete().eq('id',id);if(error)setError(error.message);else await load()};
  const maxNotes=Math.max(1,...items.map(i=>i.kanban_notes.length+1));
  return <main>
-  <header><div className="mark"><Check size={18}/></div><div><h1>Threadboard</h1><p>One thing at a time, one update at a time.</p></div><div className="status"><span></span>Synced</div></header>
   <section className="board-shell">
    {loading?<div className="loading"><LoaderCircle className="spin"/>Loading your board…</div>:<>
     <div className="board" style={{'--cols':maxNotes+1}}>
