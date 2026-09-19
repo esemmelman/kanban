@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createClient} from '@supabase/supabase-js';
-import {ArrowRight, LoaderCircle, MoreHorizontal, Trash2} from 'lucide-react';
+import {ArrowRight, LoaderCircle, Mic, MoreHorizontal, Trash2} from 'lucide-react';
 import packageInfo from '../package.json';
 import './styles.css';
 
@@ -17,12 +17,14 @@ function Editable({value,onSave,placeholder,emphasis=false,autoFocus=false,clear
 }
 
 function App(){
- const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[newItem,setNewItem]=useState(''),[adding,setAdding]=useState(false),[error,setError]=useState('');
+ const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[newItem,setNewItem]=useState(''),[adding,setAdding]=useState(false),[listening,setListening]=useState(false),[error,setError]=useState('');
  const [touchDragging,setTouchDragging]=useState(null); const draggingId=useRef(null); const savingOrder=useRef(false); const itemsRef=useRef([]); const touchTimer=useRef(null); const touchStart=useRef(null);
+ const recognitionRef=useRef(null); const voiceLimitTimer=useRef(null); const silenceTimer=useRef(null); const tapTimer=useRef(null); const lastTap=useRef(0);
  useEffect(()=>{itemsRef.current=items},[items]);
  const load=async()=>{if(draggingId.current||savingOrder.current)return;const {data,error}=await supabase.from('kanban_items').select('*, kanban_notes(*)').order('position').order('position',{referencedTable:'kanban_notes'});if(error)setError(error.message);else setItems(data||[]);setLoading(false)};
  useEffect(()=>{load();const channel=supabase.channel('board').on('postgres_changes',{event:'*',schema:'public',table:'kanban_items'},load).on('postgres_changes',{event:'*',schema:'public',table:'kanban_notes'},load).subscribe();return()=>supabase.removeChannel(channel)},[]);
- const addItem=async e=>{e.preventDefault();const title=newItem.trim();if(!title)return;setAdding(true);const {error}=await supabase.from('kanban_items').insert({title,position:items.length});if(error)setError(error.message);else{setNewItem('');await load()}setAdding(false)};
+ useEffect(()=>()=>{clearTimeout(tapTimer.current);clearTimeout(voiceLimitTimer.current);clearTimeout(silenceTimer.current);recognitionRef.current?.abort()},[]);
+ const addItem=async e=>{e.preventDefault();stopVoice();const title=newItem.trim();if(!title)return;setAdding(true);const {error}=await supabase.from('kanban_items').insert({title,position:items.length});if(error)setError(error.message);else{setNewItem('');await load()}setAdding(false)};
  const updateItem=async(id,title)=>{await supabase.from('kanban_items').update({title}).eq('id',id);await load()};
  const updateNote=async(id,content)=>{await supabase.from('kanban_notes').update({content}).eq('id',id);await load()};
  const addNote=async(itemId,position,content)=>{const {error}=await supabase.from('kanban_notes').insert({item_id:itemId,content,position});if(error){setError(error.message);throw error}await load()};
@@ -33,8 +35,13 @@ function App(){
  const startTouchDrag=(itemId,event)=>{if(event.target.closest('button,input'))return;const touch=event.touches[0];touchStart.current={x:touch.clientX,y:touch.clientY};clearTimeout(touchTimer.current);touchTimer.current=setTimeout(()=>{draggingId.current=itemId;setTouchDragging(itemId);navigator.vibrate?.(30)},300)};
  const moveTouchDrag=event=>{const touch=event.touches[0];if(!draggingId.current){if(touchStart.current&&Math.hypot(touch.clientX-touchStart.current.x,touch.clientY-touchStart.current.y)>10)clearTimeout(touchTimer.current);return}event.preventDefault();const row=document.elementFromPoint(touch.clientX,touch.clientY)?.closest('[data-row-id]');if(row)moveRow(row.dataset.rowId)};
  const endTouchDrag=async()=>{clearTimeout(touchTimer.current);touchStart.current=null;if(!draggingId.current)return;setTouchDragging(null);await finishRowDrag()};
+ const stopVoice=()=>{clearTimeout(voiceLimitTimer.current);clearTimeout(silenceTimer.current);recognitionRef.current?.stop()};
+ const resetSilenceTimer=()=>{clearTimeout(silenceTimer.current);silenceTimer.current=setTimeout(stopVoice,3000)};
+ const startVoice=()=>{const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SpeechRecognition){setError('Voice dictation is not supported by this browser.');return}if(recognitionRef.current||listening)return;const recognition=new SpeechRecognition();const startingText=newItem.trim();recognitionRef.current=recognition;recognition.continuous=true;recognition.interimResults=true;recognition.lang=navigator.language||'en-US';recognition.onstart=()=>{setListening(true);resetSilenceTimer();voiceLimitTimer.current=setTimeout(stopVoice,10000)};recognition.onresult=event=>{let finalText='',interimText='';for(let i=0;i<event.results.length;i++){const words=event.results[i][0].transcript.trim();if(event.results[i].isFinal)finalText+=`${words} `;else interimText+=words}setNewItem([startingText,finalText.trim(),interimText.trim()].filter(Boolean).join(' '));resetSilenceTimer()};recognition.onerror=event=>{if(!['aborted','no-speech'].includes(event.error))setError(`Voice dictation: ${event.error}`)};recognition.onend=()=>{clearTimeout(voiceLimitTimer.current);clearTimeout(silenceTimer.current);recognitionRef.current=null;setListening(false)};try{recognition.start()}catch{recognitionRef.current=null;setListening(false)}};
+ const handleVoiceTap=()=>{const now=Date.now();if(now-lastTap.current<350){clearTimeout(tapTimer.current);lastTap.current=0;if(recognitionRef.current)stopVoice();return}lastTap.current=now;clearTimeout(tapTimer.current);tapTimer.current=setTimeout(()=>{lastTap.current=0;startVoice()},350)};
  const maxNotes=Math.max(1,...items.map(i=>i.kanban_notes.length+1));
  return <main>
+  <form className={`new-item sticky-new-item ${listening?'listening':''}`} onSubmit={addItem}><input disabled={adding} value={newItem} onChange={e=>setNewItem(e.target.value)} onPointerUp={handleVoiceTap} placeholder={listening?'Listening… speak now':adding?'Adding…':'Tap to dictate or type a new item…'}/><Mic className="voice-icon" size={20}/></form>
   <section className="board-shell">
    {loading?<div className="loading"><LoaderCircle className="spin"/>Loading your board…</div>:<>
     <div className="board" style={{'--cols':maxNotes+1}}>
@@ -47,7 +54,6 @@ function App(){
     {items.length===0&&<div className="empty"><MoreHorizontal/><h2>Your board is ready.</h2><p>Add the first item below, then follow its story across the row.</p></div>}
    </>}
   </section>
-  <form className="new-item" onSubmit={addItem}><input disabled={adding} value={newItem} onChange={e=>setNewItem(e.target.value)} placeholder={adding?'Adding…':'Type a new item and press Enter…'}/></form>
   {error&&<div className="error" onClick={()=>setError('')}>{error}</div>}
   <footer><span>{items.length} {items.length===1?'item':'items'} · v{packageInfo.version}</span><span>Click any entry to edit · Enter to save</span></footer>
  </main>
