@@ -5,6 +5,7 @@ import {ArrowRight, Check, LoaderCircle, MoreHorizontal, Trash2} from 'lucide-re
 import './styles.css';
 
 const supabase=createClient(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+const formatTimestamp=value=>new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));
 
 function Editable({value,onSave,placeholder,emphasis=false,autoFocus=false,clearOnSave=false}){
  const [text,setText]=useState(value||''); const [saving,setSaving]=useState(false); const ref=useRef(null); const savingRef=useRef(false);
@@ -22,6 +23,7 @@ function App(){
  const updateNote=async(id,content)=>{await supabase.from('kanban_notes').update({content}).eq('id',id);await load()};
  const addNote=async(itemId,position,content)=>{const {error}=await supabase.from('kanban_notes').insert({item_id:itemId,content,position});if(error){setError(error.message);throw error}await load()};
  const remove=async id=>{await supabase.from('kanban_items').delete().eq('id',id);await load()};
+ const removeNote=async id=>{const {error}=await supabase.from('kanban_notes').delete().eq('id',id);if(error)setError(error.message);else await load()};
  const maxNotes=Math.max(1,...items.map(i=>i.kanban_notes.length+1));
  return <main>
   <header><div className="mark"><Check size={18}/></div><div><h1>Threadboard</h1><p>One thing at a time, one update at a time.</p></div><div className="status"><span></span>Synced</div></header>
@@ -30,7 +32,7 @@ function App(){
     <div className="board" style={{'--cols':maxNotes+1}}>
      {items.map(item=><div className="row" key={item.id}>
       <div className="cell item-cell"><div className="item-number">{String(items.indexOf(item)+1).padStart(2,'0')}</div><Editable emphasis value={item.title} onSave={v=>updateItem(item.id,v)}/><button className="delete" onClick={()=>remove(item.id)} title="Delete item"><Trash2 size={15}/></button></div>
-      {item.kanban_notes.map((note,index)=><React.Fragment key={note.id}><div className="connector"><ArrowRight size={15}/></div><div className="cell note-cell"><div className="note-meta">UPDATE {String(index+1).padStart(2,'0')}</div><Editable value={note.content} onSave={v=>updateNote(note.id,v)}/></div></React.Fragment>)}
+      {item.kanban_notes.map(note=><React.Fragment key={note.id}><div className="connector"><ArrowRight size={15}/></div><div className="cell note-cell"><div className="note-meta">{formatTimestamp(note.created_at)}</div><Editable value={note.content} onSave={v=>updateNote(note.id,v)}/><button className="delete" onClick={()=>removeNote(note.id)} title="Delete note" aria-label="Delete note"><Trash2 size={15}/></button></div></React.Fragment>)}
       <React.Fragment key={`add-${item.id}-${item.kanban_notes.length}`}><div className="connector"><ArrowRight size={15}/></div><div className="cell add-note"><Editable clearOnSave placeholder="Add next update…" value="" onSave={v=>addNote(item.id,item.kanban_notes.length,v)}/></div></React.Fragment>
      </div>)}
     </div>
