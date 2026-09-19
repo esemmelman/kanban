@@ -33,7 +33,7 @@ function App(){
    {loading?<div className="loading"><LoaderCircle className="spin"/>Loading your board…</div>:<>
     <div className="board" style={{'--cols':maxNotes+1}}>
      {items.map(item=><div className="row" key={item.id}>
-      <div className="cell item-cell"><div className="item-number">{String(items.indexOf(item)+1).padStart(2,'0')}</div><Editable emphasis value={item.title} onSave={v=>updateItem(item.id,v)}/><button className="delete" onClick={()=>remove(item.id)} title="Delete item"><Trash2 size={15}/></button></div>
+      <div className="cell item-cell"><div className="item-number">{formatTimestamp(item.created_at)}</div><Editable emphasis value={item.title} onSave={v=>updateItem(item.id,v)}/><button className="delete" onClick={()=>remove(item.id)} title="Delete item"><Trash2 size={15}/></button></div>
       {item.kanban_notes.map(note=><React.Fragment key={note.id}><div className="connector"><ArrowRight size={15}/></div><div className="cell note-cell"><div className="note-meta">{formatTimestamp(note.created_at)}</div><Editable value={note.content} onSave={v=>updateNote(note.id,v)}/><button className="delete" onClick={()=>removeNote(note.id)} title="Delete note" aria-label="Delete note"><Trash2 size={15}/></button></div></React.Fragment>)}
       <React.Fragment key={`add-${item.id}-${item.kanban_notes.length}`}><div className="connector"><ArrowRight size={15}/></div><div className="cell add-note"><Editable clearOnSave placeholder="Add next update…" value="" onSave={v=>addNote(item.id,item.kanban_notes.length,v)}/></div></React.Fragment>
      </div>)}
