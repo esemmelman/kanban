@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createClient} from '@supabase/supabase-js';
 import {ArrowRight, Check, LoaderCircle, MoreHorizontal, Trash2} from 'lucide-react';
+import packageInfo from '../package.json';
 import './styles.css';
 
 const supabase=createClient(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
@@ -41,7 +42,7 @@ function App(){
   </section>
   <form className="new-item" onSubmit={addItem}><input disabled={adding} value={newItem} onChange={e=>setNewItem(e.target.value)} placeholder={adding?'Adding…':'Type a new item and press Enter…'}/></form>
   {error&&<div className="error" onClick={()=>setError('')}>{error}</div>}
-  <footer><span>{items.length} {items.length===1?'item':'items'}</span><span>Click any entry to edit · Enter to save</span></footer>
+  <footer><span>{items.length} {items.length===1?'item':'items'} · v{packageInfo.version}</span><span>Click any entry to edit · Enter to save</span></footer>
  </main>
 }
 createRoot(document.getElementById('root')).render(<App/>);
