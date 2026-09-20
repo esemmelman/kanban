@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createClient} from '@supabase/supabase-js';
-import {ArrowRight, LoaderCircle, Mic, MoreHorizontal, Trash2} from 'lucide-react';
+import {ArrowRight, GripVertical, LoaderCircle, Mic, MoreHorizontal, Trash2} from 'lucide-react';
 import packageInfo from '../package.json';
 import './styles.css';
 
@@ -24,7 +24,7 @@ function Editable({value,onSave,placeholder,emphasis=false,autoFocus=false,clear
 
 function App(){
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[newItem,setNewItem]=useState(''),[adding,setAdding]=useState(false),[listening,setListening]=useState(false),[error,setError]=useState('');
- const [selectedRow,setSelectedRow]=useState(null); const draggingId=useRef(null); const savingOrder=useRef(false); const itemsRef=useRef([]);
+ const [selectedRow,setSelectedRow]=useState(null); const [touchDragging,setTouchDragging]=useState(null); const draggingId=useRef(null); const savingOrder=useRef(false); const itemsRef=useRef([]);
  const recognitionRef=useRef(null); const voiceLimitTimer=useRef(null); const silenceTimer=useRef(null); const tapTimer=useRef(null); const lastTap=useRef(0); const voiceText=useRef(''); const cancelVoice=useRef(false); const heardSpeech=useRef(false);
  useEffect(()=>{itemsRef.current=items},[items]);
  const load=async()=>{if(draggingId.current||savingOrder.current)return;const {data,error}=await supabase.from('kanban_items').select('*, kanban_notes(*)').order('position').order('position',{referencedTable:'kanban_notes'});if(error)setError(error.message);else setItems(data||[]);setLoading(false)};
@@ -40,6 +40,9 @@ function App(){
  const showNextCard=event=>{event.stopPropagation();const current=event.currentTarget.closest('.cell');const cards=[...event.currentTarget.closest('.row').querySelectorAll('.cell')];const next=cards[cards.indexOf(current)+1];next?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'start'})};
  const moveRow=overId=>{const from=itemsRef.current.findIndex(item=>item.id===draggingId.current);const to=itemsRef.current.findIndex(item=>item.id===overId);if(from<0||to<0||from===to)return;const reordered=[...itemsRef.current];const [moved]=reordered.splice(from,1);reordered.splice(to,0,moved);itemsRef.current=reordered;setItems(reordered)};
  const finishRowDrag=async()=>{if(!draggingId.current)return;const reordered=itemsRef.current;savingOrder.current=true;draggingId.current=null;const results=await Promise.all(reordered.map((item,position)=>supabase.from('kanban_items').update({position}).eq('id',item.id)));const failed=results.find(result=>result.error);if(failed)setError(failed.error.message);savingOrder.current=false;await load()};
+ const startHandleDrag=(itemId,event)=>{event.stopPropagation();draggingId.current=itemId;setTouchDragging(itemId);navigator.vibrate?.(20)};
+ const moveHandleDrag=event=>{if(!draggingId.current)return;event.preventDefault();event.stopPropagation();const touch=event.touches[0];const row=document.elementFromPoint(touch.clientX,touch.clientY)?.closest('[data-row-id]');if(row)moveRow(row.dataset.rowId)};
+ const endHandleDrag=async event=>{event.preventDefault();event.stopPropagation();setTouchDragging(null);await finishRowDrag()};
  const handleRowTap=async(itemId,event)=>{if(!window.matchMedia('(pointer: coarse)').matches||event.target.closest('.note-cell,.add-note,button,input'))return;if(!selectedRow){setSelectedRow(itemId);navigator.vibrate?.(20);return}if(selectedRow===itemId){setSelectedRow(null);return}draggingId.current=selectedRow;moveRow(itemId);setSelectedRow(null);await finishRowDrag()};
  const stopVoice=(shouldSave=false)=>{cancelVoice.current=!shouldSave;clearTimeout(voiceLimitTimer.current);clearTimeout(silenceTimer.current);recognitionRef.current?.stop()};
  const resetSilenceTimer=()=>{clearTimeout(silenceTimer.current);silenceTimer.current=setTimeout(()=>stopVoice(true),3000)};
@@ -51,8 +54,8 @@ function App(){
   <section className="board-shell">
    {loading?<div className="loading"><LoaderCircle className="spin"/>Loading your board…</div>:<>
     <div className="board" style={{'--cols':maxNotes+1}}>
-     {items.map(item=><div className={`row ${selectedRow===item.id?'selected':''}`} data-row-id={item.id} key={item.id} draggable onClick={event=>handleRowTap(item.id,event)} onDragStart={event=>{draggingId.current=item.id;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',item.id);event.currentTarget.classList.add('dragging')}} onDragOver={event=>{event.preventDefault();event.dataTransfer.dropEffect='move';moveRow(item.id)}} onDrop={event=>{event.preventDefault();finishRowDrag()}} onDragEnd={event=>{event.currentTarget.classList.remove('dragging');finishRowDrag()}}>
-      <div className="cell item-cell"><div className="item-number">{formatTimestamp(item.created_at)}</div><Editable emphasis value={item.title} onSave={v=>updateItem(item.id,v)}/>{item.kanban_notes.length>0&&<button className="next-card" onClick={showNextCard} title="Show next card" aria-label="Show next card"><ArrowRight size={16}/></button>}<button className="delete" onClick={()=>remove(item.id)} title="Delete item"><Trash2 size={15}/></button></div>
+     {items.map(item=><div className={`row ${selectedRow===item.id?'selected':''} ${touchDragging===item.id?'dragging touch-dragging':''}`} data-row-id={item.id} key={item.id} draggable onClick={event=>handleRowTap(item.id,event)} onDragStart={event=>{if(!event.target.closest('.drag-handle')){event.preventDefault();return}draggingId.current=item.id;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',item.id);event.currentTarget.classList.add('dragging')}} onDragOver={event=>{event.preventDefault();event.dataTransfer.dropEffect='move';moveRow(item.id)}} onDrop={event=>{event.preventDefault();finishRowDrag()}} onDragEnd={event=>{event.currentTarget.classList.remove('dragging');finishRowDrag()}}>
+      <div className="cell item-cell"><button className="drag-handle" draggable title="Drag row" aria-label="Drag row" onTouchStart={event=>startHandleDrag(item.id,event)} onTouchMove={moveHandleDrag} onTouchEnd={endHandleDrag} onTouchCancel={endHandleDrag}><GripVertical size={20}/></button><div className="item-number">{formatTimestamp(item.created_at)}</div><Editable emphasis value={item.title} onSave={v=>updateItem(item.id,v)}/>{item.kanban_notes.length>0&&<button className="next-card" onClick={showNextCard} title="Show next card" aria-label="Show next card"><ArrowRight size={16}/></button>}<button className="delete" onClick={()=>remove(item.id)} title="Delete item"><Trash2 size={15}/></button></div>
       {item.kanban_notes.map((note,index)=><React.Fragment key={note.id}><div className="connector"><ArrowRight size={15}/></div><div className="cell note-cell"><div className="note-meta">{formatTimestamp(note.created_at)}</div><Editable voice value={note.content} onSave={v=>updateNote(note.id,v)}/>{index<item.kanban_notes.length-1&&<button className="next-card" onClick={showNextCard} title="Show next card" aria-label="Show next card"><ArrowRight size={16}/></button>}<button className="delete" onClick={()=>removeNote(note.id)} title="Delete note" aria-label="Delete note"><Trash2 size={15}/></button></div></React.Fragment>)}
       <React.Fragment key={`add-${item.id}-${item.kanban_notes.length}`}><div className="connector"><ArrowRight size={15}/></div><div className="cell add-note"><Editable voice clearOnSave placeholder="Tap to dictate or type an update…" value="" onSave={v=>addNote(item.id,item.kanban_notes.length,v)}/></div></React.Fragment>
      </div>)}
