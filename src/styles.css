@@ -15,3 +15,4 @@ main{padding-top:16px}.sticky-new-item{position:sticky;top:0;z-index:30;margin-b
 .row{cursor:default}.drag-handle{position:absolute;left:4px;top:50%;z-index:4;display:grid;place-items:center;transform:translateY(-50%);border:0;background:#eef0ea;color:#58645e;border-radius:7px;padding:8px 2px;cursor:grab;touch-action:none;opacity:.85}.drag-handle:active{cursor:grabbing;color:#173f32;background:#e2e8dd;opacity:1}.item-cell:hover .drag-handle{opacity:1}@media(max-width:700px){.drag-handle{left:5px;padding:12px 3px;opacity:1}}
 .item-number,.note-meta{left:50%;right:auto;width:calc(100% - 100px);max-width:none!important;transform:translateX(-50%);text-align:center}
 .item-cell>.editable{padding-left:30px;padding-right:8px}
+.sticky-new-item{transition:transform .2s ease,opacity .2s ease}.drag-active .sticky-new-item{transform:translateY(calc(-100% - 24px));opacity:0;pointer-events:none}
