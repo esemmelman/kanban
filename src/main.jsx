@@ -24,12 +24,12 @@ function Editable({value,onSave,placeholder,emphasis=false,autoFocus=false,clear
 
 function App(){
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[newItem,setNewItem]=useState(''),[adding,setAdding]=useState(false),[listening,setListening]=useState(false),[error,setError]=useState('');
- const [selectedRow,setSelectedRow]=useState(null); const [touchDragging,setTouchDragging]=useState(null); const draggingId=useRef(null); const savingOrder=useRef(false); const itemsRef=useRef([]);
+ const [selectedRow,setSelectedRow]=useState(null); const [touchDragging,setTouchDragging]=useState(null); const draggingId=useRef(null); const savingOrder=useRef(false); const itemsRef=useRef([]); const gripTimer=useRef(null);
  const recognitionRef=useRef(null); const voiceLimitTimer=useRef(null); const silenceTimer=useRef(null); const tapTimer=useRef(null); const lastTap=useRef(0); const voiceText=useRef(''); const cancelVoice=useRef(false); const heardSpeech=useRef(false);
  useEffect(()=>{itemsRef.current=items},[items]);
  const load=async()=>{if(draggingId.current||savingOrder.current)return;const {data,error}=await supabase.from('kanban_items').select('*, kanban_notes(*)').order('position').order('position',{referencedTable:'kanban_notes'});if(error)setError(error.message);else setItems(data||[]);setLoading(false)};
  useEffect(()=>{load();const channel=supabase.channel('board').on('postgres_changes',{event:'*',schema:'public',table:'kanban_items'},load).on('postgres_changes',{event:'*',schema:'public',table:'kanban_notes'},load).subscribe();return()=>supabase.removeChannel(channel)},[]);
- useEffect(()=>()=>{clearTimeout(tapTimer.current);clearTimeout(voiceLimitTimer.current);clearTimeout(silenceTimer.current);recognitionRef.current?.abort()},[]);
+ useEffect(()=>()=>{clearTimeout(tapTimer.current);clearTimeout(voiceLimitTimer.current);clearTimeout(silenceTimer.current);clearTimeout(gripTimer.current);recognitionRef.current?.abort()},[]);
  const saveNewItem=async rawTitle=>{const title=rawTitle.trim();if(!title)return;setAdding(true);const {error}=await supabase.from('kanban_items').insert({title,position:itemsRef.current.length});if(error)setError(error.message);else{setNewItem('');await load()}setAdding(false)};
  const addItem=async e=>{e.preventDefault();stopVoice(false);await saveNewItem(newItem)};
  const updateItem=async(id,title)=>{await supabase.from('kanban_items').update({title}).eq('id',id);await load()};
@@ -40,9 +40,9 @@ function App(){
  const showNextCard=event=>{event.stopPropagation();const current=event.currentTarget.closest('.cell');const cards=[...event.currentTarget.closest('.row').querySelectorAll('.cell')];const next=cards[cards.indexOf(current)+1];next?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'start'})};
  const moveRow=overId=>{const from=itemsRef.current.findIndex(item=>item.id===draggingId.current);const to=itemsRef.current.findIndex(item=>item.id===overId);if(from<0||to<0||from===to)return;const reordered=[...itemsRef.current];const [moved]=reordered.splice(from,1);reordered.splice(to,0,moved);itemsRef.current=reordered;setItems(reordered)};
  const finishRowDrag=async()=>{if(!draggingId.current)return;const reordered=itemsRef.current;savingOrder.current=true;draggingId.current=null;const results=await Promise.all(reordered.map((item,position)=>supabase.from('kanban_items').update({position}).eq('id',item.id)));const failed=results.find(result=>result.error);if(failed)setError(failed.error.message);savingOrder.current=false;await load()};
- const startHandleDrag=(itemId,event)=>{event.stopPropagation();draggingId.current=itemId;setTouchDragging(itemId);navigator.vibrate?.(20)};
+ const startHandleDrag=(itemId,event)=>{event.stopPropagation();clearTimeout(gripTimer.current);gripTimer.current=setTimeout(()=>{draggingId.current=itemId;setTouchDragging(itemId);navigator.vibrate?.(35)},2000)};
  const moveHandleDrag=event=>{if(!draggingId.current)return;event.preventDefault();event.stopPropagation();const touch=event.touches[0];const row=document.elementFromPoint(touch.clientX,touch.clientY)?.closest('[data-row-id]');if(row)moveRow(row.dataset.rowId)};
- const endHandleDrag=async event=>{event.preventDefault();event.stopPropagation();setTouchDragging(null);await finishRowDrag()};
+ const endHandleDrag=async event=>{event.preventDefault();event.stopPropagation();clearTimeout(gripTimer.current);if(!draggingId.current)return;setTouchDragging(null);await finishRowDrag()};
  const handleRowTap=async(itemId,event)=>{if(!window.matchMedia('(pointer: coarse)').matches||event.target.closest('.note-cell,.add-note,button,input'))return;if(!selectedRow){setSelectedRow(itemId);navigator.vibrate?.(20);return}if(selectedRow===itemId){setSelectedRow(null);return}draggingId.current=selectedRow;moveRow(itemId);setSelectedRow(null);await finishRowDrag()};
  const stopVoice=(shouldSave=false)=>{cancelVoice.current=!shouldSave;clearTimeout(voiceLimitTimer.current);clearTimeout(silenceTimer.current);recognitionRef.current?.stop()};
  const resetSilenceTimer=()=>{clearTimeout(silenceTimer.current);silenceTimer.current=setTimeout(()=>stopVoice(true),3000)};
