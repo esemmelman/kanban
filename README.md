@@ -14,5 +14,4 @@ The database schema is in `supabase/migrations`.
 
 ## Archive
 
-Click Archive on the first card in a row to archive the entire sequence, including its updates. Use the Archived tab to view saved sequences and click Restore to return one to the active board. Archive status syncs across devices.
-
+Click Archive on the first card in a row to archive the entire sequence, including its updates. Use the View archive link in the footer to view saved sequences and click Restore to return one to the active board. Archive status syncs across devices.

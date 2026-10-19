@@ -61,7 +61,6 @@ function App(){
  const maxNotes=Math.max(1,...items.map(i=>i.kanban_notes.length+1));
  return <main className={selectedRow?'drag-active':''}>
   {!showArchived&&<form className={`new-item sticky-new-item ${listening?'listening':''}`} onSubmit={addItem}><input disabled={adding} value={newItem} onChange={e=>setNewItem(e.target.value)} onPointerUp={handleVoiceTap} placeholder={listening?'Listening… speak now':adding?'Adding…':'Tap to dictate or type a new item…'}/><Mic className="voice-icon" size={20}/></form>}
-  <nav className="board-views" aria-label="Board view"><button aria-pressed={!showArchived} onClick={()=>{setShowArchived(false);setSelectedRow(null)}}>Active ({items.length-archivedCount})</button><button aria-pressed={showArchived} onClick={()=>{setShowArchived(true);setSelectedRow(null)}}><Archive size={16}/>Archived ({archivedCount})</button></nav>
   <section className="board-shell">
    {loading?<div className="loading"><LoaderCircle className="spin"/>Loading your board…</div>:<>
     <div className="board" style={{'--cols':maxNotes+1}}>
@@ -75,7 +74,7 @@ function App(){
    </>}
   </section>
   {error&&<div className="error" onClick={()=>setError('')}>{error}</div>}
-  <footer><span>{visibleItems.length} {visibleItems.length===1?'item':'items'} · v{packageInfo.version}</span><span>Click any entry to edit · Enter to save</span></footer>
+  <footer><span>{visibleItems.length} {visibleItems.length===1?'item':'items'} · v{packageInfo.version}</span>{(showArchived||archivedCount>0)&&<button className="archive-view-link" onClick={()=>{setShowArchived(!showArchived);setSelectedRow(null)}}>{showArchived?'Back to board':'View archive'}</button>}<span>Click any entry to edit · Enter to save</span></footer>
  </main>
 }
 createRoot(document.getElementById('root')).render(<App/>);
