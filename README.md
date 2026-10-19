@@ -11,3 +11,8 @@ Live at <https://esemmelman.github.io/kanban/>.
 3. Run `npm run dev`.
 
 The database schema is in `supabase/migrations`.
+
+## Archive
+
+Click Archive on the first card in a row to archive the entire sequence, including its updates. Use the Archived tab to view saved sequences and click Restore to return one to the active board. Archive status syncs across devices.
+
