@@ -12,10 +12,8 @@ Live at <https://esemmelman.github.io/kanban/>.
 
 The database schema is in `supabase/migrations`.
 
-## Archive
+## Editing and completion
 
-Click Archive on the first card in a row to archive the entire sequence, including its updates. Use the View archive link in the footer to view saved sequences and click Restore to return one to the active board. Archive status syncs across devices.
+Click a card to open its rich text editor. Bold, italic, underline, and lists are supported. Changes save automatically after a short pause and when leaving the editor. Use Done to close it. Each card has a synced Complete checkbox beside its left-aligned timestamp. Trash remains in the upper right.
 
-## Later
-
-Click Later beside Archive on the first card to hide the entire sequence from the active board. Open Later in the footer and click Bring back to return a sequence to the board. Later status syncs across devices and is separate from Archive.
+All existing sequences appear on the board, including those previously marked Later or Archive.

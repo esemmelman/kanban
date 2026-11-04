@@ -1,7 +1,8 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createClient} from '@supabase/supabase-js';
-import {Archive, ArchiveRestore, ArrowRight, Clock, GripVertical, LoaderCircle, Mic, MoreHorizontal, Trash2} from 'lucide-react';
+import {ArrowRight, GripVertical, LoaderCircle, Mic, MoreHorizontal, Trash2} from 'lucide-react';
+import DOMPurify from 'dompurify';
 import packageInfo from '../package.json';
 import './styles.css';
 
@@ -24,17 +25,39 @@ function Editable({value,onSave,placeholder,emphasis=false,autoFocus=false,clear
 }
 
 
-function Entry({value,onSave,emphasis=false,voice=false}){
- const [expanded,setExpanded]=useState(false);
+const sanitize=html=>DOMPurify.sanitize(html,{ALLOWED_TAGS:['p','div','br','strong','b','em','i','u','ul','ol','li'],ALLOWED_ATTR:[]});
+const entryHtml=(value,html)=>html?sanitize(html):String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+
+function Entry({value,html,onSave,emphasis=false}){
+ const [expanded,setExpanded]=useState(false),[status,setStatus]=useState(''),[problem,setProblem]=useState('');
+ const editor=useRef(null),timer=useRef(null),queue=useRef(Promise.resolve()),lastSaved=useRef(entryHtml(value,html)),saveRef=useRef(onSave);
+ saveRef.current=onSave;
+ useEffect(()=>{if(!expanded)lastSaved.current=entryHtml(value,html)},[value,html,expanded]);
+ useEffect(()=>{if(expanded&&editor.current){editor.current.innerHTML=lastSaved.current;editor.current.focus()}},[expanded]);
+ useEffect(()=>()=>clearTimeout(timer.current),[]);
+ const save=()=>{
+  clearTimeout(timer.current);
+  if(!editor.current)return queue.current;
+  const rich=sanitize(editor.current.innerHTML),plain=editor.current.innerText.trim();
+  if(!plain){setProblem('Enter some text before saving.');return Promise.resolve(false)}
+  setStatus('Saving…');setProblem('');
+  const task=queue.current.then(async()=>{if(rich===lastSaved.current){setStatus('Saved');return true;}try{await saveRef.current(plain,rich);lastSaved.current=rich;setStatus('Saved');return true}catch(error){setStatus('');setProblem(error.message||'Could not save. Try again.');return false}});
+  queue.current=task;return task;
+ };
+ const changed=()=>{setStatus('Unsaved');clearTimeout(timer.current);timer.current=setTimeout(save,600)};
  return <div className={'entry '+(expanded?'expanded':'')}>
-  {expanded?<><Editable value={value} onSave={onSave} emphasis={emphasis} voice={voice} autoFocus/><button className="collapse-entry" onClick={()=>setExpanded(false)} aria-label="Collapse entry">Collapse</button></>:<button className={'entry-preview '+(emphasis?'emphasis':'')} onClick={()=>setExpanded(true)} aria-label={`Expand entry: ${value}`} aria-expanded={false}>{value}</button>}
+  {expanded?<><div className="rich-toolbar" role="toolbar" aria-label="Text formatting">{[['bold','Bold','B'],['italic','Italic','I'],['underline','Underline','U'],['insertUnorderedList','Bulleted list','• List'],['insertOrderedList','Numbered list','1. List']].map(([command,label,text])=><button key={command} type="button" aria-label={label} onMouseDown={e=>e.preventDefault()} onClick={()=>{editor.current.focus();document.execCommand(command);changed()}}>{text}</button>)}</div><div ref={editor} className={'rich-editor '+(emphasis?'emphasis':'')} contentEditable suppressContentEditableWarning role="textbox" aria-label="Edit entry" aria-multiline="true" onInput={changed} onBlur={()=>{save()}} onPaste={event=>{event.preventDefault();document.execCommand('insertHTML',false,sanitize(event.clipboardData.getData('text/html'))||entryHtml(event.clipboardData.getData('text/plain')));changed()}}/><div className="editor-status" role="status">{problem||status}{problem&&<button onClick={save}>Retry</button>}</div><button className="collapse-entry" onClick={async()=>{if(await save()!==false)setExpanded(false)}}>Done</button></>:<button className={'entry-preview '+(emphasis?'emphasis':'')} onClick={()=>setExpanded(true)} aria-label={`Edit entry: ${value}`} aria-expanded={false}><span dangerouslySetInnerHTML={{__html:entryHtml(value,html)}}/></button>}
  </div>
+}
+
+function CardMeta({record,onComplete}){
+ const [saving,setSaving]=useState(false),[checked,setChecked]=useState(Boolean(record.completed));
+ useEffect(()=>setChecked(Boolean(record.completed)),[record.completed]);
+ return <div className="card-meta"><time dateTime={record.created_at}>{formatTimestamp(record.created_at)}</time><label className="complete-control" title="Complete"><input type="checkbox" aria-label="Complete entry" checked={checked} disabled={saving} onChange={async event=>{const next=event.target.checked;setChecked(next);setSaving(true);try{await onComplete(next)}catch{setChecked(Boolean(record.completed))}finally{setSaving(false)}}}/><span>Complete</span></label></div>
 }
 
 function App(){
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[newItem,setNewItem]=useState(''),[adding,setAdding]=useState(false),[listening,setListening]=useState(false),[error,setError]=useState('');
- const [view,setView]=useState('board'),[archivingId,setArchivingId]=useState(null);
- const showArchived=view==='archive',showLater=view==='later',showBoard=view==='board';
  const [selectedRow,setSelectedRow]=useState(null); const draggingId=useRef(null); const savingOrder=useRef(false); const itemsRef=useRef([]);
  const recognitionRef=useRef(null); const voiceLimitTimer=useRef(null); const silenceTimer=useRef(null); const tapTimer=useRef(null); const lastTap=useRef(0); const voiceText=useRef(''); const cancelVoice=useRef(false); const heardSpeech=useRef(false);
  useEffect(()=>{itemsRef.current=items},[items]);
@@ -43,11 +66,11 @@ function App(){
  useEffect(()=>()=>{clearTimeout(tapTimer.current);clearTimeout(voiceLimitTimer.current);clearTimeout(silenceTimer.current);recognitionRef.current?.abort()},[]);
  const saveNewItem=async rawTitle=>{const title=rawTitle.trim();if(!title)return;setAdding(true);const {error}=await supabase.from('kanban_items').insert({title,position:Math.max(-1,...itemsRef.current.map(item=>item.position))+1});if(error)setError(error.message);else{setNewItem('');await load()}setAdding(false)};
  const addItem=async e=>{e.preventDefault();stopVoice(false);await saveNewItem(newItem)};
- const updateItem=async(id,title)=>{await supabase.from('kanban_items').update({title}).eq('id',id);await load()};
- const updateNote=async(id,content)=>{await supabase.from('kanban_notes').update({content}).eq('id',id);await load()};
+ const saveCard=async(table,id,patch)=>{const {error}=await supabase.from(table).update(patch).eq('id',id).select('id').single();if(error){setError(error.message);throw error}await load()};
+ const updateItem=(id,title,rich_text)=>saveCard('kanban_items',id,{title,rich_text});
+ const updateNote=(id,content,rich_text)=>saveCard('kanban_notes',id,{content,rich_text});
+ const completeCard=(table,id,completed)=>saveCard(table,id,{completed});
  const addNote=async(itemId,position,content)=>{const {error}=await supabase.from('kanban_notes').insert({item_id:itemId,content,position});if(error){setError(error.message);throw error}await load()};
- const setArchived=async(item,archived)=>{if(archived&&!window.confirm("Archive this sequence and all its updates? You can restore it from the archive later."))return;setArchivingId(item.id);try{const {data,error}=await supabase.from('kanban_items').update({archived,later:false}).eq('id',item.id).select('id').single();if(error)throw error;if(!data)throw new Error('Unable to update archive status.');setSelectedRow(null);await load()}catch(error){setError(error.message)}finally{setArchivingId(null)}};
- const setLater=async(item,later)=>{setArchivingId(item.id);try{const {data,error}=await supabase.from('kanban_items').update({later,archived:false}).eq('id',item.id).select('id').single();if(error)throw error;if(!data)throw new Error('Unable to update Later status.');setSelectedRow(null);await load()}catch(error){setError(error.message)}finally{setArchivingId(null)}};
  const remove=async id=>{await supabase.from('kanban_items').delete().eq('id',id);await load()};
  const removeNote=async id=>{const {error}=await supabase.from('kanban_notes').delete().eq('id',id);if(error)setError(error.message);else await load()};
  const showNextCard=event=>{event.stopPropagation();const current=event.currentTarget.closest('.cell');const cards=[...event.currentTarget.closest('.row').querySelectorAll('.cell')];const next=cards[cards.indexOf(current)+1];next?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'start'})};
@@ -58,26 +81,24 @@ function App(){
  const resetSilenceTimer=()=>{clearTimeout(silenceTimer.current);silenceTimer.current=setTimeout(()=>stopVoice(true),3000)};
  const startVoice=()=>{const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SpeechRecognition){setError('Voice dictation is not supported by this browser.');return}if(recognitionRef.current||listening)return;const recognition=new SpeechRecognition();const startingText=newItem.trim();let lastSpeechAt=0;voiceText.current=startingText;cancelVoice.current=false;heardSpeech.current=false;recognitionRef.current=recognition;recognition.continuous=true;recognition.interimResults=true;recognition.lang=navigator.language||'en-US';recognition.onstart=()=>{setListening(true);resetSilenceTimer();voiceLimitTimer.current=setTimeout(()=>stopVoice(true),10000)};recognition.onresult=event=>{const transcript=correctDictation(mergeSpeechResults(event.results));const combined=[startingText,transcript].filter(Boolean).join(' ');heardSpeech.current=Boolean(transcript);lastSpeechAt=Date.now();voiceText.current=combined;setNewItem(combined);resetSilenceTimer()};recognition.onerror=event=>{if(!['aborted','no-speech'].includes(event.error))setError(`Voice dictation: ${event.error}`)};recognition.onend=()=>{clearTimeout(voiceLimitTimer.current);clearTimeout(silenceTimer.current);recognitionRef.current=null;setListening(false);if(cancelVoice.current||!heardSpeech.current)return;const remaining=Math.max(0,3000-(Date.now()-lastSpeechAt));silenceTimer.current=setTimeout(async()=>{const clean=capitalizeFirstLetter(voiceText.current);setNewItem(clean);await saveNewItem(clean)},remaining)};try{recognition.start()}catch{recognitionRef.current=null;setListening(false)}};
  const handleVoiceTap=()=>{const now=Date.now();if(now-lastTap.current<350){clearTimeout(tapTimer.current);lastTap.current=0;if(recognitionRef.current)stopVoice();return}lastTap.current=now;clearTimeout(tapTimer.current);tapTimer.current=setTimeout(()=>{lastTap.current=0;startVoice()},350)};
- const visibleItems=items.filter(item=>showArchived?Boolean(item.archived):showLater?Boolean(item.later)&&!item.archived:!item.archived&&!item.later);
- const archivedCount=items.filter(item=>item.archived).length;
- const laterCount=items.filter(item=>item.later&&!item.archived).length;
+ const visibleItems=items;
  const maxNotes=Math.max(1,...items.map(i=>i.kanban_notes.length+1));
  return <main className={selectedRow?'drag-active':''}>
-  {showBoard&&<form className={`new-item sticky-new-item ${listening?'listening':''}`} onSubmit={addItem}><input disabled={adding} value={newItem} onChange={e=>setNewItem(e.target.value)} onPointerUp={handleVoiceTap} placeholder={listening?'Listening… speak now':adding?'Adding…':'Tap to dictate or type a new item…'}/><Mic className="voice-icon" size={20}/></form>}
+  {<form className={`new-item sticky-new-item ${listening?'listening':''}`} onSubmit={addItem}><input disabled={adding} value={newItem} onChange={e=>setNewItem(e.target.value)} onPointerUp={handleVoiceTap} placeholder={listening?'Listening… speak now':adding?'Adding…':'Tap to dictate or type a new item…'}/><Mic className="voice-icon" size={20}/></form>}
   <section className="board-shell">
    {loading?<div className="loading"><LoaderCircle className="spin"/>Loading your board…</div>:<>
     <div className="board" style={{'--cols':maxNotes+1}}>
      {visibleItems.map(item=><div className={`row ${selectedRow===item.id?'selected':''}`} data-row-id={item.id} key={item.id} draggable onDragStart={event=>{if(!event.target.closest('.drag-handle')){event.preventDefault();return}draggingId.current=item.id;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',item.id);event.currentTarget.classList.add('dragging')}} onDragOver={event=>{event.preventDefault();event.dataTransfer.dropEffect='move';moveRow(item.id)}} onDrop={event=>{event.preventDefault();finishRowDrag()}} onDragEnd={event=>{event.currentTarget.classList.remove('dragging');finishRowDrag()}}>
-      <div className={`cell item-cell ${item.kanban_notes.length===0?'last-entry':''}`} title={item.title}><button className="drag-handle" draggable title="Select or drag row" aria-label="Select or drag row" onClick={event=>handleGripTap(item.id,event)}><GripVertical size={20}/></button><div className="item-number">{formatTimestamp(item.created_at)}</div><Entry emphasis value={item.title} onSave={v=>updateItem(item.id,v)}/>{item.kanban_notes.length>0&&<button className="next-card" onClick={showNextCard} title="Show next card" aria-label="Show next card"><ArrowRight size={16}/></button>}<div className="sequence-actions"><button className="later-entry" disabled={archivingId===item.id} onClick={()=>setLater(item,!item.later)} title={item.later?'Return sequence to board':'Save sequence for later'}><Clock size={15}/> {item.later?'Bring back':'Later'}</button><button className="archive-entry" disabled={archivingId===item.id} onClick={()=>setArchived(item,!item.archived)} title={item.archived?'Restore sequence':'Archive sequence'}>{archivingId===item.id?<LoaderCircle className="spin" size={15}/>:item.archived?<ArchiveRestore size={15}/>:<Archive size={15}/>} {item.archived?'Restore':'Archive'}</button></div><button className="delete" onClick={()=>remove(item.id)} title="Delete item"><Trash2 size={15}/></button></div>
-      {item.kanban_notes.map((note,index)=><React.Fragment key={note.id}><div className="connector"><ArrowRight size={15}/></div><div className={`cell note-cell ${index===item.kanban_notes.length-1?'last-entry':''}`} title={note.content}><div className="note-meta">{formatTimestamp(note.created_at)}</div><Entry voice value={note.content} onSave={v=>updateNote(note.id,v)}/>{index<item.kanban_notes.length-1&&<button className="next-card" onClick={showNextCard} title="Show next card" aria-label="Show next card"><ArrowRight size={16}/></button>}<button className="delete" onClick={()=>removeNote(note.id)} title="Delete note" aria-label="Delete note"><Trash2 size={15}/></button></div></React.Fragment>)}
-      {showBoard&&<React.Fragment key={`add-${item.id}-${item.kanban_notes.length}`}><div className="connector"><ArrowRight size={15}/></div><div className="cell add-note"><Editable voice clearOnSave placeholder="Tap to dictate or type an update…" value="" onSave={v=>addNote(item.id,item.kanban_notes.length,v)}/></div></React.Fragment>}
+      <div className={`cell item-cell ${item.completed?'completed':''} ${item.kanban_notes.length===0?'last-entry':''}`} title={item.title} onClick={event=>{if(event.target===event.currentTarget)event.currentTarget.querySelector('.entry-preview')?.click()}}><button className="drag-handle" draggable title="Select or drag row" aria-label="Select or drag row" onClick={event=>handleGripTap(item.id,event)}><GripVertical size={20}/></button><CardMeta record={item} onComplete={v=>completeCard('kanban_items',item.id,v)}/><Entry emphasis value={item.title} html={item.rich_text} onSave={(v,h)=>updateItem(item.id,v,h)}/>{item.kanban_notes.length>0&&<button className="next-card" onClick={showNextCard} title="Show next card" aria-label="Show next card"><ArrowRight size={16}/></button>}<button className="delete" onClick={()=>remove(item.id)} title="Delete item"><Trash2 size={15}/></button></div>
+      {item.kanban_notes.map((note,index)=><React.Fragment key={note.id}><div className="connector"><ArrowRight size={15}/></div><div className={`cell note-cell ${note.completed?'completed':''} ${index===item.kanban_notes.length-1?'last-entry':''}`} title={note.content} onClick={event=>{if(event.target===event.currentTarget)event.currentTarget.querySelector('.entry-preview')?.click()}}><CardMeta record={note} onComplete={v=>completeCard('kanban_notes',note.id,v)}/><Entry value={note.content} html={note.rich_text} onSave={(v,h)=>updateNote(note.id,v,h)}/>{index<item.kanban_notes.length-1&&<button className="next-card" onClick={showNextCard} title="Show next card" aria-label="Show next card"><ArrowRight size={16}/></button>}<button className="delete" onClick={()=>removeNote(note.id)} title="Delete note" aria-label="Delete note"><Trash2 size={15}/></button></div></React.Fragment>)}
+      {<React.Fragment key={`add-${item.id}-${item.kanban_notes.length}`}><div className="connector"><ArrowRight size={15}/></div><div className="cell add-note"><Editable voice clearOnSave placeholder="Tap to dictate or type an update…" value="" onSave={v=>addNote(item.id,item.kanban_notes.length,v)}/></div></React.Fragment>}
      </div>)}
     </div>
-    {visibleItems.length===0&&<div className="empty"><MoreHorizontal/><h2>{showArchived?'No archived sequences.':showLater?'Nothing saved for later.':'Your board is ready.'}</h2><p>{showArchived?'Archived sequences will appear here. Restore one to return it to the board.':showLater?'Use Later on a sequence to hide it from the board until you need it.':'Add an item above, then follow its story across the row.'}</p></div>}
+    {visibleItems.length===0&&<div className="empty"><MoreHorizontal/><h2>Your board is ready.</h2><p>Add an item above, then follow its story across the row.</p></div>}
    </>}
   </section>
   {error&&<div className="error" onClick={()=>setError('')}>{error}</div>}
-  <footer><span>{visibleItems.length} {visibleItems.length===1?'item':'items'} · v{packageInfo.version}</span><nav className="board-views" aria-label="Board views">{!showBoard&&<button className="archive-view-link" onClick={()=>{setView('board');setSelectedRow(null)}}>Back to board</button>}{(showLater||laterCount>0)&&<button className="archive-view-link" aria-current={showLater?'page':undefined} onClick={()=>{setView('later');setSelectedRow(null)}}>Later ({laterCount})</button>}{(showArchived||archivedCount>0)&&<button className="archive-view-link" aria-current={showArchived?'page':undefined} onClick={()=>{setView('archive');setSelectedRow(null)}}>View archive</button>}</nav><span>Click any entry to edit · Enter to save</span></footer>
+  <footer><span>{visibleItems.length} {visibleItems.length===1?'item':'items'} · v{packageInfo.version}</span><span>Click any entry to edit · Changes save automatically</span></footer>
  </main>
 }
 createRoot(document.getElementById('root')).render(<App/>);
