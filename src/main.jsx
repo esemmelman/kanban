@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
+import {createPortal} from 'react-dom';
 import {createClient} from '@supabase/supabase-js';
 import {ArrowRight, GripVertical, LoaderCircle, Mic, MoreHorizontal} from 'lucide-react';
 import DOMPurify from 'dompurify';
@@ -30,10 +31,11 @@ const entryHtml=(value,html)=>html?sanitize(html):String(value||'').replace(/&/g
 
 function Entry({value,html,onSave,emphasis=false}){
  const [expanded,setExpanded]=useState(false),[status,setStatus]=useState(''),[problem,setProblem]=useState('');
+ const dialog=useRef(null),trigger=useRef(null);
  const editor=useRef(null),timer=useRef(null),queue=useRef(Promise.resolve()),lastSaved=useRef(entryHtml(value,html)),saveRef=useRef(onSave);
  saveRef.current=onSave;
  useEffect(()=>{if(!expanded)lastSaved.current=entryHtml(value,html)},[value,html,expanded]);
- useEffect(()=>{if(expanded&&editor.current){editor.current.innerHTML=lastSaved.current;editor.current.focus()}},[expanded]);
+ useEffect(()=>{if(!expanded)return;const previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';dialog.current.showModal();editor.current.innerHTML=lastSaved.current;editor.current.focus();return()=>{document.body.style.overflow=previousOverflow;trigger.current?.focus()}},[expanded]);
  useEffect(()=>()=>clearTimeout(timer.current),[]);
  const save=()=>{
   clearTimeout(timer.current);
@@ -46,7 +48,7 @@ function Entry({value,html,onSave,emphasis=false}){
  };
  const changed=()=>{setStatus('Unsaved');clearTimeout(timer.current);timer.current=setTimeout(save,600)};
  return <div className={'entry '+(expanded?'expanded':'')}>
-  {expanded?<><div className="rich-toolbar" role="toolbar" aria-label="Text formatting">{[['bold','Bold','B'],['italic','Italic','I'],['underline','Underline','U'],['insertUnorderedList','Bulleted list','• List'],['insertOrderedList','Numbered list','1. List']].map(([command,label,text])=><button key={command} type="button" aria-label={label} onMouseDown={e=>e.preventDefault()} onClick={()=>{editor.current.focus();document.execCommand(command);changed()}}>{text}</button>)}</div><div ref={editor} className={'rich-editor '+(emphasis?'emphasis':'')} contentEditable suppressContentEditableWarning role="textbox" aria-label="Edit entry" aria-multiline="true" onInput={changed} onBlur={()=>{save()}} onPaste={event=>{event.preventDefault();document.execCommand('insertHTML',false,sanitize(event.clipboardData.getData('text/html'))||entryHtml(event.clipboardData.getData('text/plain')));changed()}}/><div className="editor-status" role="status">{problem||status}{problem&&<button onClick={save}>Retry</button>}</div><button className="collapse-entry" onClick={async()=>{if(await save()!==false)setExpanded(false)}}>Done</button></>:<button className={'entry-preview '+(emphasis?'emphasis':'')} onClick={()=>setExpanded(true)} aria-label={`Edit entry: ${value}`} aria-expanded={false}><span dangerouslySetInnerHTML={{__html:entryHtml(value,html)}}/></button>}
+  {expanded&&createPortal(<dialog ref={dialog} className="entry-dialog" aria-label="Edit card" onCancel={async event=>{event.preventDefault();if(await save()!==false)setExpanded(false)}}><div className="entry-dialog-heading">Edit card</div><div className="rich-toolbar" role="toolbar" aria-label="Text formatting">{[['bold','Bold','B'],['italic','Italic','I'],['underline','Underline','U'],['insertUnorderedList','Bulleted list','• List'],['insertOrderedList','Numbered list','1. List']].map(([command,label,text])=><button key={command} type="button" aria-label={label} onMouseDown={e=>e.preventDefault()} onClick={()=>{editor.current.focus();document.execCommand(command);changed()}}>{text}</button>)}</div><div ref={editor} className={'rich-editor '+(emphasis?'emphasis':'')} contentEditable suppressContentEditableWarning role="textbox" aria-label="Edit entry" aria-multiline="true" onInput={changed} onBlur={()=>{save()}} onPaste={event=>{event.preventDefault();document.execCommand('insertHTML',false,sanitize(event.clipboardData.getData('text/html'))||entryHtml(event.clipboardData.getData('text/plain')));changed()}}/><div className="editor-status" role="status">{problem||status}{problem&&<button onClick={save}>Retry</button>}</div><button className="collapse-entry" onClick={async()=>{if(await save()!==false)setExpanded(false)}}>Done</button></dialog>,document.body)}<button ref={trigger} className={'entry-preview '+(emphasis?'emphasis':'')} onClick={()=>setExpanded(true)} aria-label={`Edit entry: ${value}`} aria-haspopup="dialog" aria-expanded={expanded}><span dangerouslySetInnerHTML={{__html:entryHtml(value,html)}}/></button>
  </div>
 }
 
