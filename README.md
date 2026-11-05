@@ -17,3 +17,7 @@ The database schema is in `supabase/migrations`.
 Click a card to open its rich text editor. Bold, italic, underline, and lists are supported. Changes save automatically after a short pause and when leaving the editor. Use Done to close it. Each card has a synced Complete checkbox beside its left-aligned timestamp. Checked entries show a strikethrough. The A button in the upper right of any card archives its entire row, including every update. Open Archived above the board and choose Restore to retrieve a row.
 
 Archived sequences appear in the Archived view. Older Later sequences remain on the active board.
+
+## Categories
+
+Enter an optional category when adding an item, or edit the Category field on an existing row. Categories save automatically on blur or Enter and apply to the entire row. Use Filter by category to show one category, Uncategorized, or All categories in either Board or Archived. Existing category names are suggested as you type.
