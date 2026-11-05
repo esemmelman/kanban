@@ -50,3 +50,5 @@ main{padding-top:16px}.sticky-new-item{position:sticky;top:0;z-index:30;margin-b
 .view-switcher{align-items:center;flex-wrap:wrap}.view-switcher .category-filter{margin-bottom:0;min-width:0}.view-switcher .category-filter select{max-width:min(65vw,320px)}
 
 .previous-card{position:absolute;left:9px;bottom:5px;display:grid;place-items:center;border:0;border-radius:4px;background:transparent;color:#59645e;padding:4px;cursor:pointer}.previous-card:hover{color:#173f32;background:#e2e8dd}.previous-card:focus-visible{outline:2px solid #173f32;outline-offset:2px}.note-cell:has(.previous-card){padding-bottom:30px}
+
+.new-category{flex-wrap:wrap}.new-category select{flex:1;min-width:0;width:100%;font:inherit;color:#25322c;background:#fff;border:1px solid #d5d8d4;border-radius:6px;padding:8px}.new-category input{flex-basis:100%}@media(max-width:700px){.new-category select{font-size:16px}}
