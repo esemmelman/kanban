@@ -55,3 +55,5 @@ main{padding-top:16px}.sticky-new-item{position:sticky;top:0;z-index:30;margin-b
 
 /* Keep category fields at the card bottom beside the row controls. */
 .cell .row-category{margin-top:10px;padding-left:24px;flex-shrink:0}.note-cell:has(.previous-card){padding-bottom:10px}.cell>.entry{margin-top:6px;margin-bottom:2px}
+
+.new-item-title input{padding-right:88px}.new-item-title .voice-icon{right:58px}.dayflow-link{position:absolute;right:8px;display:grid;place-items:center;width:36px;height:36px;border-radius:7px;color:#173f32;text-decoration:none;font-size:18px;touch-action:manipulation}.dayflow-link:hover{background:#edf2e8}.dayflow-link:focus-visible{outline:2px solid #173f32;outline-offset:2px}
