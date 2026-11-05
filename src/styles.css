@@ -61,3 +61,5 @@ main{padding-top:16px}.sticky-new-item{position:sticky;top:0;z-index:30;margin-b
 .card-meta .previous-card{position:static;flex:0 0 auto;padding:4px}
 
 .drag-handle,.drag-handle:active{cursor:pointer;touch-action:manipulation}.drag-handle[aria-pressed="true"]{background:#173f32;color:#fff}.drag-handle:focus-visible{outline:2px solid #173f32;outline-offset:3px}.move-instructions{font-size:13px;color:#173f32;margin:0 0 12px}
+
+.app-version{margin-left:auto;padding:5px 9px;border:1px solid #d5d8d4;border-radius:6px;background:#fff;color:#253c30;font-size:13px;white-space:nowrap}
