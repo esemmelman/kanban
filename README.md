@@ -23,3 +23,7 @@ Archived sequences appear in the Archived view. Older Later sequences remain on 
 Enter an optional category when adding an item, or edit the Category field on an existing row. Categories save automatically on blur or Enter and apply to the entire row. Use Filter by category to show one category, Uncategorized, or All categories in either Board or Archived. Existing category names are suggested as you type.
 
 When dictating a new item or update, end with “Category” followed by a category name (for example, “Call the plumber. Category Home”). The final Category phrase sets the row category and is removed from the saved text. Without it, the existing or selected category is kept.
+
+## Adding and moving rows
+
+New items appear first on the board. Click or touch a row’s handle, then another row’s handle to move the selected row to that position. Select the same handle again to cancel. The whole row moves with its updates.
